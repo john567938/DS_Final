@@ -1,0 +1,83 @@
+1.  <div>
+
+    ---
+    title: "MyFirstRMD"
+    author: "My Name"
+    date: "2023-06-14"
+    output:
+      pdf_document: default
+      html_document: default
+    ---
+
+    </div>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+```
+
+# **NYPD Shooting Incident Data (Historic)**
+
+The data that is being analyzed in this document is NYPD Shooting Incident Data. This data contains all of the shooting incidents from NYPD starting from 2006 all the way up to the end of 2022. The data includes information regarding the event, location, time, and information regarding the suspect.
+
+```{r Importing data}
+url_in <- "https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD"
+
+nypd_shooting_data <- read.csv(url_in)
+
+head(nypd_shooting_data, n=5)
+```
+
+## Cleaning The Data
+
+After viewing the data above I decided to remove the columns containing data regarding LOC_OF_OCCUR_DESC, LOC_CLASSFCTN_DESC, LOCATION_DESC, X_COORD_CD, Y_COORD_CD, Latitude, Longitude, and Lon_Lat. I choose to remove this data because it is not relevant to the analysis I want to perform. I also decided to make all missing data equal to "'Unknown". Below you can see the commands I ran and the new data set.
+
+```{r Cleaning the data}
+ nypd_shooting_data <- nypd_shooting_data %>% select(-c(LOC_OF_OCCUR_DESC, LOC_CLASSFCTN_DESC, LOCATION_DESC, X_COORD_CD, Y_COORD_CD, Latitude, Longitude, Lon_Lat))
+
+nypd_shooting_data[nypd_shooting_data==""]<-"Unknown"
+
+head(nypd_shooting_data,n=5)
+
+```
+
+Below is code that groups the shootings by borough and shows the total amount of shootings reported by NYPD from 2006-2022.
+
+```{r}
+shootings_by_borough <- nypd_shooting_data %>%
+  group_by(BORO, year = substr(OCCUR_DATE, start = nchar(OCCUR_DATE) - 3, stop = nchar(OCCUR_DATE))) %>%
+  summarize(Total_Shootings = n())
+
+# Create a bar plot
+ggplot(shootings_by_borough, aes(x = BORO, y = Total_Shootings, fill = year)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Borough", y = "Total Shootings", fill = "") +
+  ggtitle("Total Shootings in each Borough from 2006 to 2022") +
+  theme_minimal()
+```
+
+Based on the graph above you can see that Brooklyn is the Borough that has had the most shootings and Staten Island is the borough with the least. When you look closely at the graph you can even see that Brooklyn had more shootings reported by NYPD from 2021-2022 than Staten Island has had in 2006-2022. Based on this data you can say that Brooklyn is the most likely borough for a shooting to occur.
+
+The below code groups the victims by race from all NYPD reported shootings and shows the total amount of victims by race.
+
+```{r}
+
+
+shootings_by_Race <- nypd_shooting_data %>%
+  group_by(VIC_RACE) %>%
+  summarize(Total_Shootings = n())
+
+ggplot(shootings_by_Race, aes(x = VIC_RACE, y = Total_Shootings, fill = VIC_RACE)) +
+  geom_bar(stat = "identity") +
+  labs(x = NULL, y = "Total Shootings", fill = "Victims Race") +
+  ggtitle("Total Shootings by Victims Race") +
+  theme_minimal() +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+```
+
+Based on the graph above we can conclude that most shooting victims are classified as Black. Based on this data though we can not conclude that Black people are more likely to be the victims of shootings than other races because the data does not include the demographic data of the people that live in New York. In order to come to that conclusion we would need to know the total amount of individuals of each race living in the area where NYPD collected the data from.
+
+# Potential Bias in the Data
+
+The data presented in the NYPD shooting reports can have many sources of bias. For instance, we do not know if the reported perpetrators of these crimes are actually guilty. In order to remove bias from this report I chose not to present any visualizations of the data regarding a perpetrator's race. I mainly felt as if this was the best way to avoid bias in my report due to the fact that we do not know the potential biases of the NYPD officers or victims that may have reported the race of the suspect.
