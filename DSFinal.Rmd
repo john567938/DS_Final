@@ -1,0 +1,114 @@
+1.  <div>
+
+    ---
+    title: "MyRMD"
+    author: "My Name"
+    date: "2023-06-14"
+    output:
+      pdf_document: default
+      html_document: default
+    ---
+
+    </div>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+```
+
+# John Hopkins COVID 19 Data Report
+
+The data that is being analyzed in this document is from the John Hopkins COVID-19 GitHub. This data contains data collected daily regarding infections and deaths from around the world. Below is code that Imports the data set. The question I wanted to answer by looking at this data was how many of the deaths from the COVID-19 pandemic came in the first part of the pandemic compared to the second and if the predicted vs actual deaths were similar.
+
+```{r Importing data}
+url_in <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/"
+
+file_names <- c("time_series_covid19_confirmed_global.csv" , "time_series_covid19_deaths_global.csv" , "time_series_covid19_confirmed_US.csv" , "time_series_covid19_deaths_US.csv" )
+urls <- str_c(url_in,file_names)
+
+global_cases <- read_csv(urls[1], show_col_types = FALSE)
+global_deaths <- read_csv(urls[2], show_col_types = FALSE)
+US_cases <- read_csv(urls[3], show_col_types = FALSE)
+US_deaths <- read_csv(urls[4], show_col_types = FALSE)
+
+```
+
+## Cleaning The Data
+
+After viewing the data above I decided to only use the global cases and global deaths data sets. I also chose to remove the columns containing data regarding Latitude and Longitude coordinates because I do not plan on using this data in my analysis. I also chose to combine the columns of province/state and country/region for my analysis.
+
+```{r Cleaning the data}
+
+global_cases <- global_cases %>% pivot_longer( cols= -c('Province/State', 'Country/Region', Lat, Long), names_to = "date", values_to = "cases") %>% select(-c(Lat,Long))
+
+global_deaths <- global_deaths %>% pivot_longer( cols= -c('Province/State', 'Country/Region', Lat, Long), names_to = "date", values_to = "deaths") %>% select(-c(Lat,Long))
+
+```
+
+Below is code that groups the global cases and deaths into one data set. I am choosing to do this because for my analysis I want to be able to compare global cases and deaths together. I also am renaming variables and reformating the date for readability purposes. Also below is a summary of the new data set.
+
+```{r}
+global <- global_cases %>% full_join(global_deaths) %>% rename(Country_Region = 'Country/Region', Province_State = 'Province/State') %>% mutate(date=mdy(date))
+summary(global)
+```
+
+# Visualizations
+
+Below is code that compares the global cases to deaths during the COVID-19 pandemic.
+
+```{r}
+ggplot(global, aes(x = date)) +
+  geom_line(aes(y = cases, color = "Cases")) +
+  geom_line(aes(y = deaths, color = "Deaths")) +
+  labs(x = "Date", y = "Count", color = "Type") +
+  ggtitle("Global COVID-19 Cases and Deaths") +
+  theme_minimal()
+```
+
+Based on the graph above we can see that at the start of the pandemic, almost everyone that got the virus died. As the pandemic continued however we see that the deaths slowly grew. While, the total amount of cases grew rapidly. This can most likely be attributed to when the vaccine came out more people started to go back to their normal lives which in turn led to the virus spreading. However, due to the majority of people being vaccinated, we did not see an increase in death rate.
+
+The code below graphs out the deaths after splitting the data in the middle in terms of the date the data was recorded.
+
+```{r}
+# Assuming 'global' is a data frame with columns: date, deaths
+
+# Calculate the midpoint of the data
+midpoint <- as.Date(mean(as.Date(global$date)))
+
+# Split the data into two halves based on the date
+first_half <- subset(global, date <= midpoint)
+second_half <- subset(global, date > midpoint)
+
+# Create a line graph comparing deaths in the first half to the second half
+ggplot() +
+  geom_line(data = first_half, aes(x = date, y = deaths, color = "First Half"), size = 1) +
+  geom_line(data = second_half, aes(x = date, y = deaths, color = "Second Half"), size = 1) +
+  labs(x = "Date", y = "Deaths", title = "Deaths in First Half vs Second Half") +
+  scale_color_manual(values = c("blue", "red"), labels = c("First Half", "Second Half")) +
+  theme_minimal()
+```
+
+Based off the graph we can see that the total number of deaths was roughly even between the first half and second half of the pandemic. When considering the prior graph we can contribute this to many more people getting the virus in the second half of the pandemic compared to the first half. So while yes the death rate may have lowered compared to the first half of the pandemic. The much larger amount of cases is a key factor in to the two halves being roughly the same.
+
+# Modeling the data
+
+```{r}
+model <- lm(deaths ~ cases + date, data = global)
+
+prediction_data <- data.frame(cases = global$cases, date = global$date)
+prediction_data$predicted_deaths <- predict(model, newdata = prediction_data)
+
+ggplot(global, aes(x = date)) +
+  geom_point(aes(y = deaths), color = "blue", alpha = 0.05) +
+  geom_line(data = prediction_data, aes(y = predicted_deaths), color = "red") +
+  labs(x = "Date", y = "Deaths", title = "Actual vs Predicted Deaths over Time") +
+  theme_minimal()
+
+```
+
+Based off of the model below we can see towards the middle of the pandemic that the amount of actual deaths was lower than what was predicted but in the end the actual deaths ended up being more than what was predicted. However the two are relatively close to each other.
+
+# Potential Bias in the Data and conclusion 
+
+Based on the graphs and model we can say that yes the death rate from COVID-19 dramatically fell over time but due to the large increase in cases, the overall predicted death count was very accurate to the actual amount of deaths. When looking at potential sources of bias in the data we do not know how a COVID death is classified. The data does not verify if death is COVID related or if someone died from other causes while having COVID. The report also does not take into consideration the age and demographics of the individuals who died. The predicted deaths could of varied per age group and potentially it was only a select age group that skewed the results.
